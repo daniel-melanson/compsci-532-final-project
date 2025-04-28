@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 kagglehub = "*"
+requests = "*"
+pandas = "*"
 
 [dev-packages]
 
