@@ -22,7 +22,7 @@ ENV PROJECT_DIR=/usr/src/${PROJECT_NAME}
 USER root
 
 COPY --from=builder /usr/local /usr/local
-RUN mkdir -v /usr/src/.venv
+RUN mkdir -p ${PROJECT_DIR}/.venv
 COPY --from=builder ${PROJECT_DIR}/.venv/ ${PROJECT_DIR}/.venv/
 
 USER spark
