@@ -7,6 +7,8 @@ name = "pypi"
 kagglehub = "*"
 requests = "*"
 pandas = "*"
+pyspark = "*"
+peewee = "*"
 
 [dev-packages]
 

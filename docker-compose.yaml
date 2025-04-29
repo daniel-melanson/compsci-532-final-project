@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  analytics-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/usr/src/analytics-engine/data
+    environment:
+      - KAGGLEHUB_CACHE=/usr/src/analytics-engine/data/.kaggle
