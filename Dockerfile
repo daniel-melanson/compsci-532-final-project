@@ -1,5 +1,5 @@
 # Python virtual environment
-FROM docker.io/python:3.13 AS builder
+FROM docker.io/python:3.11 AS builder
 
 ENV PROJECT_NAME=analytics-engine
 ENV PROJECT_DIR=/usr/src/${PROJECT_NAME}
@@ -22,6 +22,7 @@ ENV PROJECT_DIR=/usr/src/${PROJECT_NAME}
 USER root
 
 COPY --from=builder /usr/local /usr/local
+COPY --from=builder /usr/lib /usr/lib
 RUN mkdir -p ${PROJECT_DIR}/.venv
 COPY --from=builder ${PROJECT_DIR}/.venv/ ${PROJECT_DIR}/.venv/
 

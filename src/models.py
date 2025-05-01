@@ -14,12 +14,18 @@ class Stock(Model):
     class Meta:
         database = db
         
-
-class StockDailyChange(Model):
+class StockDailySummary(Model):
     id = AutoField(primary_key=True)
-    symbol = TextField(unique=True)
+    symbol = TextField()
     date = TextField()
-    change = FloatField()
+    open = FloatField()
+    high = FloatField()
+    low = FloatField()
+    close = FloatField()
+    volume = FloatField()
+    absolute_change = FloatField()
+    percentage_change = FloatField(default=0.0)
     
     class Meta:
         database = db
+        unique_together = ("symbol", "date")

@@ -1,5 +1,7 @@
 services:
   analytics-engine:
+    tty: true
+    stdin_open: true
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,3 +9,33 @@ services:
       - ./data:/usr/src/analytics-engine/data
     environment:
       - KAGGLEHUB_CACHE=/usr/src/analytics-engine/data/.kaggle
+      - DEBUG=true
+  db:
+    image: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+  metabase:
+    image: metabase/metabase:v0.35.3
+    volumes:
+      - metabasedata:/metabase-data
+      - ./data:/usr/src/analytics-engine/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=db
+      - MB_DB_PORT=5432
+      - MB_DB_DBNAME=postgres
+      - MB_DB_USER=postgres
+      - MB_DB_PASS=postgres
+      - MB_JETTY_PORT=3000
+
+volumes:
+  pgdata:
+  metabasedata:
