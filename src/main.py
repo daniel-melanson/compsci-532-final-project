@@ -1,4 +1,5 @@
 from models import db, Stock, DB_FILE_PATH, StockDailyChange
+import re
 from pyspark.sql import SparkSession
 import requests
 import tempfile
@@ -15,7 +16,7 @@ NIFTY_TRADING_DATA_URL = (
 
 def init_database():
     db.connect()
-    db.create_tables([Stock, StockDailyChange])
+    db.create_tables([Stock, StockDailyChange], safe=True)
 
     response = requests.get(
         NIFTY_500_CSV,
@@ -41,23 +42,30 @@ def init_database():
     Stock.insert_many(df.to_dict(orient="records")).execute()
 
 
-def main():
-    if not os.path.exists(DB_FILE_PATH):
-        init_database()
-
+def read_data(spark):
     data_path = kagglehub.dataset_download(NIFTY_TRADING_DATA_URL)
-
-    spark = SparkSession.builder.appName("AnalyticsEngine").getOrCreate()
 
     csv_files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
 
     dataframes = {}
     for file in csv_files:
         file_path = os.path.join(data_path, file)
-        df = spark.read.option("header", "true").csv(file_path)
-        dataframes[file] = df
+        symbol = re.search(r"(\w+)_minute\.csv", file).group(1)
+        if not symbol or not Stock.select().where(Stock.symbol == symbol).exists():
+            continue
 
-    print(dataframes)
+        df = spark.read.option("header", "true").csv(file_path)
+        dataframes[symbol] = df
+
+    return dataframes
+
+
+def main():
+    if not os.path.exists(DB_FILE_PATH):
+        init_database()
+
+    spark = SparkSession.builder.appName("AnalyticsEngine").getOrCreate()
+    dataframes = read_data(spark)
     spark.stop()
 
 
