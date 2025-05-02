@@ -18,6 +18,9 @@ FROM spark:3.5.5-scala2.12-java17-ubuntu AS spark
 ENV PROJECT_NAME=analytics-engine
 ENV PROJECT_DIR=/usr/src/${PROJECT_NAME}
 
+# Download PostgreSQL JDBC driver
+RUN wget https://jdbc.postgresql.org/download/postgresql-42.7.5.jar -O /opt/spark/jars/postgresql-42.7.5.jar
+
 # Copy python and virtual environment from builder
 USER root
 

@@ -10,6 +10,8 @@ services:
     environment:
       - KAGGLEHUB_CACHE=/usr/src/analytics-engine/data/.kaggle
       - DEBUG=true
+    depends_on:
+      - db
   db:
     image: postgres
     volumes:

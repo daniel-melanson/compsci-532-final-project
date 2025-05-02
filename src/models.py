@@ -17,9 +17,11 @@ db = PostgresqlExtDatabase(
     DB_NAME, user="postgres", password="postgres", host="db", port=5432
 )
 
+
 def init_db():
     with db:
         db.create_tables([Stock, StockDailySummary, StockMovingAverage], safe=True)
+
 
 class Stock(Model):
     id = AutoField(primary_key=True)

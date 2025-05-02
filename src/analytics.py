@@ -80,11 +80,15 @@ def iterate_dataframes(dataframes):
             break
 
 
-def batch_insert(df, model):
-    batch_size = 10000
+def save_to_db(df, model):
+    # df.write.format("jdbc").option("url", "jdbc:postgresql://db/").option(
+    #     "dbtable", model.__name__
+    # ).option("user", "postgres").mode("overwrite").option("password", "postgres").save()
+
+    batch_size = 1000
     for i in range(0, df.count(), batch_size):
         batch_df = df.limit(batch_size).offset(i).toPandas()
-        model.insert_many(batch_df.to_dict(orient="records")).execute()
+        model.insert_many(batch_df.to_dict(orient="records")).on_conflict_ignore().execute()
 
 
 def calculate_daily_summary(dataframes):
@@ -114,7 +118,7 @@ def calculate_daily_summary(dataframes):
         )
 
         summary_dfs[symbol] = df
-        batch_insert(df, StockDailySummary)
+        save_to_db(df, StockDailySummary)
 
     return summary_dfs
 
@@ -144,4 +148,4 @@ def calculate_moving_averages(summaries):
         )
 
         df.show(5)
-        batch_insert(df, StockMovingAverage)
+        save_to_db(df, StockMovingAverage)
