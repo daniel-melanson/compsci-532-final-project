@@ -36,9 +36,8 @@ class Stock(Model):
 
 
 class StockDailySummary(Model):
-    id = AutoField(primary_key=True)
     symbol = TextField()
-    date = TextField()
+    date = DateTimeField()
     open = FloatField()
     high = FloatField()
     low = FloatField()
@@ -53,9 +52,8 @@ class StockDailySummary(Model):
 
 
 class StockMovingAverage(Model):
-    id = AutoField(primary_key=True)
     symbol = TextField()
-    date = TextField()
+    date = DateTimeField()
     moving_average = FloatField()
     period = IntegerField()
 

@@ -1,6 +1,6 @@
 from pyspark.sql.functions import col, first, max, min, last, sum, lit, when, avg
 from pyspark.sql.window import Window
-from models import Stock, StockDailySummary, StockMovingAverage
+from models import Stock, StockDailySummary, StockMovingAverage, DB_NAME
 import os
 import requests
 import pandas as pd
@@ -14,6 +14,10 @@ NIFTY_TRADING_DATA_URL = (
     "debashis74017/algo-trading-data-nifty-100-data-with-indicators"
 )
 
+""""
+Stocks: Daily percent change, daily absolute change, rolling 50-day average, sector weight 
+Sectors: Daily percent change, daily absolute change, rolling 50-day average, market capitalization
+"""
 
 def init_stocks():
     if not os.path.exists(NIFTY_500_CSV_PATH):
@@ -81,14 +85,14 @@ def iterate_dataframes(dataframes):
 
 
 def save_to_db(df, model):
-    # df.write.format("jdbc").option("url", "jdbc:postgresql://db/").option(
-    #     "dbtable", model.__name__
-    # ).option("user", "postgres").mode("overwrite").option("password", "postgres").save()
+    df.write.format("jdbc").option("url", f"jdbc:postgresql://db/{DB_NAME}").option(
+        "dbtable", f"public.{model.__name__}"
+    ).option("user", "postgres").mode("overwrite").option("password", "postgres").save()
 
-    batch_size = 1000
-    for i in range(0, df.count(), batch_size):
-        batch_df = df.limit(batch_size).offset(i).toPandas()
-        model.insert_many(batch_df.to_dict(orient="records")).on_conflict_ignore().execute()
+    # batch_size = 1000
+    # for i in range(0, df.count(), batch_size):
+    #     batch_df = df.limit(batch_size).offset(i).toPandas()
+    #     model.insert_many(batch_df.to_dict(orient="records")).on_conflict_ignore().execute()
 
 
 def calculate_daily_summary(dataframes):
