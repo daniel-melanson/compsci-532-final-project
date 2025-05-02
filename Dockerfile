@@ -28,6 +28,7 @@ COPY --from=builder ${PROJECT_DIR}/.venv/ ${PROJECT_DIR}/.venv/
 
 USER spark
 
+# Verify python environment
 RUN ${PROJECT_DIR}/.venv/bin/python -c "import requests; print(requests.__version__)"
 
 WORKDIR ${PROJECT_DIR}

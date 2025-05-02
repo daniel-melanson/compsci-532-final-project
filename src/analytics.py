@@ -1,5 +1,6 @@
-from pyspark.sql.functions import col, first, max, min, last, sum, lit, when
-from models import Stock, StockDailySummary
+from pyspark.sql.functions import col, first, max, min, last, sum, lit, when, avg
+from pyspark.sql.window import Window
+from models import Stock, StockDailySummary, StockMovingAverage
 import os
 import requests
 import pandas as pd
@@ -116,3 +117,31 @@ def calculate_daily_summary(dataframes):
         batch_insert(df, StockDailySummary)
 
     return summary_dfs
+
+
+def calculate_moving_averages(summaries):
+    StockMovingAverage.delete().execute()
+
+    for symbol, df in iterate_dataframes(summaries):
+        df = (
+            df.withColumn(
+                "moving_average",
+                avg(col("close")).over(
+                    Window.partitionBy("symbol").orderBy("date").rowsBetween(-50, 0)
+                ),
+            )
+            .withColumn("period", lit(50))
+            .drop(
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "absolute_change",
+                "percentage_change",
+                "datetime",
+            )
+        )
+
+        df.show(5)
+        batch_insert(df, StockMovingAverage)

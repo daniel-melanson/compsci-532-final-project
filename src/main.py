@@ -1,23 +1,21 @@
-from models import (
-    db,
-    Stock,
-    DB_FILE_PATH,
-    StockDailySummary,
-)
+from models import init_db
 from pyspark.sql import SparkSession
-from analytics import init_stocks, read_data, calculate_daily_summary
+from analytics import init_stocks, read_data, calculate_daily_summary, calculate_moving_averages
 
 
 def main():
-    with db:
-        db.create_tables([Stock, StockDailySummary], safe=True)
-
+    init_db()
     init_stocks()
 
     spark = SparkSession.builder.appName("AnalyticsEngine").getOrCreate()
     dataframes = read_data(spark)
 
-    calculate_daily_summary(dataframes)
+    # Calculate daily summaries for each stock
+    summaries = calculate_daily_summary(dataframes)
+
+    # Calculate moving averages for each stock
+    calculate_moving_averages(summaries)
+        
     spark.stop()
 
 
