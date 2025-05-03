@@ -20,7 +20,18 @@ db = PostgresqlExtDatabase(
 
 def init_db():
     with db:
-        db.create_tables([Stock, StockDailySummary, StockMovingAverage, StockRSI, StockBollingerBand], safe=True)
+        db.create_tables(
+            [
+                Stock,
+                StockDailySummary,
+                StockMovingAverage,
+                StockRSI,
+                StockBollingerBand,
+                StockATR,
+                StockOBV,
+            ],
+            safe=True,
+        )
 
 
 class Stock(Model):
@@ -42,6 +53,7 @@ class StockDailySummary(Model):
     high = FloatField()
     low = FloatField()
     close = FloatField()
+    prev_close = FloatField()
     volume = FloatField()
     absolute_change = FloatField()
     percentage_change = FloatField(default=0.0)
@@ -82,4 +94,25 @@ class StockBollingerBand(Model):
     class Meta:
         database = db
         unique_together = ("symbol", "date")
-    
+
+
+class StockATR(Model):
+    symbol = TextField()
+    date = DateTimeField()
+    atr = FloatField()
+    period = IntegerField()
+
+    class Meta:
+        database = db
+        unique_together = ("symbol", "date", "period")
+
+
+class StockOBV(Model):
+    symbol = TextField()
+    date = DateTimeField()
+    obv = FloatField()
+    period = IntegerField()
+
+    class Meta:
+        database = db
+        unique_together = ("symbol", "date", "period")

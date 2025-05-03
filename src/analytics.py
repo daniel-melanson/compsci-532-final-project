@@ -1,6 +1,7 @@
 from pyspark.sql.functions import (
     col,
     first,
+    greatest,
     max,
     min,
     last,
@@ -20,6 +21,8 @@ from models import (
     DB_NAME,
     StockRSI,
     StockBollingerBand,
+    StockATR,
+    StockOBV,
 )
 import os
 import requests
@@ -151,6 +154,10 @@ def calculate_daily_summary(dataframes):
                 sum(col("volume")).alias("volume"),
             )
             .withColumn("symbol", lit(symbol))
+            .withColumn(
+                "prev_close",
+                lag("close").over(Window.partitionBy("symbol").orderBy("date")),
+            )
             .withColumn("absolute_change", col("close") - col("open"))
             .withColumn(
                 "percentage_change",
@@ -188,6 +195,7 @@ def calculate_moving_averages(summaries, period=50):
                 "absolute_change",
                 "percentage_change",
                 "datetime",
+                "prev_close",
             )
         )
 
@@ -203,11 +211,7 @@ def calculate_rsi(summaries):
         window_14d = Window.partitionBy("symbol").orderBy("date").rowsBetween(-13, 0)
 
         df = (
-            df.withColumn(
-                "prev_close",
-                lag("close").over(Window.partitionBy("symbol").orderBy("date")),
-            )
-            .withColumn("price_change", col("close") - col("prev_close"))
+            df.withColumn("price_change", col("close") - col("prev_close"))
             .withColumn(
                 "gain", when(col("price_change") > 0, col("price_change")).otherwise(0)
             )
@@ -277,7 +281,82 @@ def calculate_bollinger_bands(summaries):
                 "sma_20",
                 "std_dev_20",
                 "datetime",
+                "prev_close",
             )
         )
 
         save_to_db(df, StockBollingerBand)
+
+
+def calculate_atr(summaries):
+    # True Range = Max(high - low, abs(high - prev_close), abs(low - prev_close))
+    # ATR = Average of True Range over N periods (N=14)
+
+    StockATR.delete().execute()
+
+    for symbol, df in iterate_dataframes(summaries):
+        window_14d = Window.partitionBy("symbol").orderBy("date").rowsBetween(-13, 0)
+        df = (
+            df.withColumn(
+                "true_range",
+                greatest(
+                    col("high") - col("low"),
+                    abs(col("high") - col("prev_close")),
+                    abs(col("low") - col("prev_close")),
+                ),
+            )
+            .withColumn("atr", avg("true_range").over(window_14d))
+            .withColumn("period", lit(14))
+            .drop(
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "absolute_change",
+                "percentage_change",
+                "prev_close",
+                "true_range",
+            )
+        )
+
+        save_to_db(df, StockATR)
+
+
+def calculate_obv(summaries):
+    # OBV = Previous OBV +
+    #       - Current Volume (if close < prev_close)
+    #       - 0 (if close = prev_close)
+    #       - Current Volume (if close > prev_close)
+    StockOBV.delete().execute()
+
+    for symbol, df in iterate_dataframes(summaries):
+        df = (
+            df.withColumn(
+                "volume_direction",
+                when(col("close") > col("prev_close"), col("volume"))
+                .when(col("close") < col("prev_close"), -col("volume"))
+                .otherwise(0),
+            )
+            .withColumn(
+                "obv",
+                sum("volume_direction").over(
+                    Window.partitionBy("symbol")
+                    .orderBy("date")
+                    .rowsBetween(Window.unboundedPreceding, 0)
+                ),
+            )
+            .drop(
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "absolute_change",
+                "percentage_change",
+                "prev_close",
+                "volume_direction",
+            )
+        )
+
+        save_to_db(df, StockOBV)

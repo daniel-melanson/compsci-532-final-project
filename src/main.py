@@ -7,6 +7,8 @@ from analytics import (
     calculate_moving_averages,
     calculate_rsi,
     calculate_bollinger_bands,
+    calculate_atr,
+    calculate_obv,
 )
 
 
@@ -32,6 +34,12 @@ def main():
 
     # Calculate Bollinger Bands for each stock
     calculate_bollinger_bands(summaries)
+
+    # Calculate ATR for each stock
+    calculate_atr(summaries)
+
+    # Calculate OBV for each stock
+    calculate_obv(summaries)
 
     spark.stop()
 
