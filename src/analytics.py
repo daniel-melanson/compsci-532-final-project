@@ -10,9 +10,17 @@ from pyspark.sql.functions import (
     avg,
     lag,
     abs,
+    stddev,
 )
 from pyspark.sql.window import Window
-from models import Stock, StockDailySummary, StockMovingAverage, DB_NAME, StockRSI
+from models import (
+    Stock,
+    StockDailySummary,
+    StockMovingAverage,
+    DB_NAME,
+    StockRSI,
+    StockBollingerBand,
+)
 import os
 import requests
 import pandas as pd
@@ -33,6 +41,9 @@ Sectors: Daily percent change, daily absolute change, rolling 50-day average, ma
 
 
 def init_stocks():
+    """
+    Initialize the stocks in the database with sectors.
+    """
     if not os.path.exists(NIFTY_500_CSV_PATH):
         response = requests.get(
             NIFTY_500_CSV,
@@ -60,6 +71,11 @@ def init_stocks():
 
 
 def read_data(spark):
+    """
+    Read the data from the Kaggle dataset. Caches the data in the file system.
+
+    Loads the data and returns a dictionary of DataFrames.
+    """
     data_path = kagglehub.dataset_download(NIFTY_TRADING_DATA_URL)
 
     csv_files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
@@ -92,6 +108,9 @@ def read_data(spark):
 
 
 def iterate_dataframes(dataframes):
+    """
+    Iterate through the dataframes.
+    """
     for symbol, df in dataframes.items():
         yield symbol, df
         if DEBUG:
@@ -99,6 +118,9 @@ def iterate_dataframes(dataframes):
 
 
 def save_to_db(df, model):
+    """
+    Save a DataFrame to a PostgreSQL database table.
+    """
     df.write.format("jdbc").option("url", f"jdbc:postgresql://db/{DB_NAME}").option(
         "dbtable", f"public.{model.__name__}"
     ).option("user", "postgres").mode("overwrite").option("password", "postgres").save()
@@ -110,6 +132,10 @@ def save_to_db(df, model):
 
 
 def calculate_daily_summary(dataframes):
+    # Daily Summary = Open, High, Low, Close, Volume, Absolute Change, Percentage Change
+    # Absolute Change = Close - Open
+    # Percentage Change = (Close - Open) / Open
+
     StockDailySummary.delete().execute()
 
     summary_dfs = {}
@@ -140,7 +166,8 @@ def calculate_daily_summary(dataframes):
     return summary_dfs
 
 
-def calculate_moving_averages(summaries):
+def calculate_moving_averages(summaries, period=50):
+    # Moving Average = (Sum of Close Prices) / (Number of Days)
     StockMovingAverage.delete().execute()
 
     for symbol, df in iterate_dataframes(summaries):
@@ -148,10 +175,10 @@ def calculate_moving_averages(summaries):
             df.withColumn(
                 "moving_average",
                 avg(col("close")).over(
-                    Window.partitionBy("symbol").orderBy("date").rowsBetween(-50, 0)
+                    Window.partitionBy("symbol").orderBy("date").rowsBetween(-period, 0)
                 ),
             )
-            .withColumn("period", lit(50))
+            .withColumn("period", lit(period))
             .drop(
                 "open",
                 "high",
@@ -223,3 +250,34 @@ def calculate_rsi(summaries):
         )
 
         save_to_db(df, StockRSI)
+
+
+def calculate_bollinger_bands(summaries):
+    # Middle Band = 20-day SMA
+    # Upper Band = Middle Band + (20-day standard deviation × 2)
+    # Lower Band = Middle Band - (20-day standard deviation × 2)
+    StockBollingerBand.delete().execute()
+
+    for symbol, df in iterate_dataframes(summaries):
+        window_20d = Window.partitionBy("symbol").orderBy("date").rowsBetween(-19, 0)
+
+        df = (
+            df.withColumn("sma_20", avg("close").over(window_20d))
+            .withColumn("std_dev_20", stddev("close").over(window_20d))
+            .withColumn("bollinger_upper", col("sma_20") + (col("std_dev_20") * 2))
+            .withColumn("bollinger_lower", col("sma_20") - (col("std_dev_20") * 2))
+            .drop(
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "absolute_change",
+                "percentage_change",
+                "sma_20",
+                "std_dev_20",
+                "datetime",
+            )
+        )
+
+        save_to_db(df, StockBollingerBand)

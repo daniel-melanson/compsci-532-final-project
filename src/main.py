@@ -6,6 +6,7 @@ from analytics import (
     calculate_daily_summary,
     calculate_moving_averages,
     calculate_rsi,
+    calculate_bollinger_bands,
 )
 
 
@@ -28,6 +29,9 @@ def main():
 
     # Calculate RSI for each stock
     calculate_rsi(summaries)
+
+    # Calculate Bollinger Bands for each stock
+    calculate_bollinger_bands(summaries)
 
     spark.stop()
 
