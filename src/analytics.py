@@ -151,5 +151,4 @@ def calculate_moving_averages(summaries):
             )
         )
 
-        df.show(5)
         save_to_db(df, StockMovingAverage)
