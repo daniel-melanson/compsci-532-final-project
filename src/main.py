@@ -5,6 +5,7 @@ from analytics import (
     read_data,
     calculate_daily_summary,
     calculate_moving_averages,
+    calculate_rsi,
 )
 
 
@@ -24,6 +25,9 @@ def main():
 
     # Calculate moving averages for each stock
     calculate_moving_averages(summaries)
+
+    # Calculate RSI for each stock
+    calculate_rsi(summaries)
 
     spark.stop()
 

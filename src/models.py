@@ -20,7 +20,7 @@ db = PostgresqlExtDatabase(
 
 def init_db():
     with db:
-        db.create_tables([Stock, StockDailySummary, StockMovingAverage], safe=True)
+        db.create_tables([Stock, StockDailySummary, StockMovingAverage, StockRSI], safe=True)
 
 
 class Stock(Model):
@@ -55,6 +55,17 @@ class StockMovingAverage(Model):
     symbol = TextField()
     date = DateTimeField()
     moving_average = FloatField()
+    period = IntegerField()
+
+    class Meta:
+        database = db
+        unique_together = ("symbol", "date", "period")
+
+
+class StockRSI(Model):
+    symbol = TextField()
+    date = DateTimeField()
+    rsi = FloatField()
     period = IntegerField()
 
     class Meta:

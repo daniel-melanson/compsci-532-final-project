@@ -1,6 +1,18 @@
-from pyspark.sql.functions import col, first, max, min, last, sum, lit, when, avg
+from pyspark.sql.functions import (
+    col,
+    first,
+    max,
+    min,
+    last,
+    sum,
+    lit,
+    when,
+    avg,
+    lag,
+    abs,
+)
 from pyspark.sql.window import Window
-from models import Stock, StockDailySummary, StockMovingAverage, DB_NAME
+from models import Stock, StockDailySummary, StockMovingAverage, DB_NAME, StockRSI
 import os
 import requests
 import pandas as pd
@@ -18,6 +30,7 @@ NIFTY_TRADING_DATA_URL = (
 Stocks: Daily percent change, daily absolute change, rolling 50-day average, sector weight 
 Sectors: Daily percent change, daily absolute change, rolling 50-day average, market capitalization
 """
+
 
 def init_stocks():
     if not os.path.exists(NIFTY_500_CSV_PATH):
@@ -69,6 +82,7 @@ def read_data(spark):
             .withColumn("volume", col("volume").cast("float"))
             .withColumn("datetime", col("date").cast("timestamp"))
             .withColumn("date", col("datetime").cast("date"))
+            .orderBy("datetime")
         )
         dataframes[symbol] = df
         if DEBUG:
@@ -102,8 +116,7 @@ def calculate_daily_summary(dataframes):
 
     for symbol, df in iterate_dataframes(dataframes):
         df = (
-            df.orderBy("datetime")
-            .groupBy("date")
+            df.groupBy("date")
             .agg(
                 first(col("open")).alias("open"),
                 max(col("high")).alias("high"),
@@ -152,3 +165,61 @@ def calculate_moving_averages(summaries):
         )
 
         save_to_db(df, StockMovingAverage)
+
+
+def calculate_rsi(summaries):
+    # RSI = 100 - (100 / (1 + RS))
+    # Where RS = Average Gain / Average Loss over N periods (N=14)
+    StockRSI.delete().execute()
+
+    for symbol, df in iterate_dataframes(summaries):
+        window_14d = Window.partitionBy("symbol").orderBy("date").rowsBetween(-13, 0)
+
+        df = (
+            df.withColumn(
+                "prev_close",
+                lag("close").over(Window.partitionBy("symbol").orderBy("date")),
+            )
+            .withColumn("price_change", col("close") - col("prev_close"))
+            .withColumn(
+                "gain", when(col("price_change") > 0, col("price_change")).otherwise(0)
+            )
+            .withColumn(
+                "loss",
+                when(col("price_change") < 0, abs(col("price_change"))).otherwise(0),
+            )
+            .withColumn("avg_gain_14", avg("gain").over(window_14d))
+            .withColumn("avg_loss_14", avg("loss").over(window_14d))
+            .withColumn(
+                "rs",
+                when(
+                    col("avg_loss_14") != 0, col("avg_gain_14") / col("avg_loss_14")
+                ).otherwise(lit(0)),
+            )
+            .withColumn(
+                "rsi_14",
+                when(col("avg_loss_14") != 0, 100 - (100 / (1 + col("rs")))).otherwise(
+                    100
+                ),
+            )
+            .withColumn("period", lit(14))
+            .drop(
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "absolute_change",
+                "percentage_change",
+                "datetime",
+                "prev_close",
+                "price_change",
+                "gain",
+                "loss",
+                "avg_gain_14",
+                "avg_loss_14",
+                "rs",
+            )
+        )
+
+        save_to_db(df, StockRSI)
