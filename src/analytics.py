@@ -14,7 +14,7 @@ from pyspark.sql.functions import (
     stddev,
 )
 from pyspark.sql.window import Window
-from prometheus_client import Summary
+from prometheus_client import Summary, Counter
 from models import (
     Stock,
     StockDailySummary,
@@ -43,6 +43,7 @@ Stocks: Daily percent change, daily absolute change, rolling 50-day average, sec
 Sectors: Daily percent change, daily absolute change, rolling 50-day average, market capitalization
 """
 
+rows_counter = Counter("rows_counter", "Number of rows processed")
 init_stocks_summary = Summary("init_stocks", "Time taken to initialize stocks")
 
 
@@ -75,6 +76,7 @@ def init_stocks():
     )
 
     Stock.insert_many(df.to_dict(orient="records")).on_conflict_ignore().execute()
+    rows_counter.inc(len(df))
 
 
 read_data_summary = Summary("read_data", "Time taken to read data")
@@ -111,6 +113,7 @@ def read_data(spark):
             .withColumn("date", col("datetime").cast("date"))
             .orderBy("datetime")
         )
+        rows_counter.inc(df.count())
         dataframes[symbol] = df
         if DEBUG:
             break
@@ -184,6 +187,7 @@ def calculate_daily_summary(dataframes):
                 ).otherwise(0.0),
             )
         )
+        rows_counter.inc(df.count())
 
         summary_dfs[symbol] = df
         save_to_db(df, StockDailySummary)
@@ -222,6 +226,7 @@ def calculate_moving_averages(summaries, period=50):
                 "prev_close",
             )
         )
+        rows_counter.inc(df.count())
 
         save_to_db(df, StockMovingAverage)
 
@@ -280,6 +285,7 @@ def calculate_rsi(summaries):
                 "rs",
             )
         )
+        rows_counter.inc(df.count())
 
         save_to_db(df, StockRSI)
 
@@ -318,6 +324,7 @@ def calculate_bollinger_bands(summaries):
                 "prev_close",
             )
         )
+        rows_counter.inc(df.count())
 
         save_to_db(df, StockBollingerBand)
 
@@ -357,7 +364,7 @@ def calculate_atr(summaries):
                 "true_range",
             )
         )
-
+        rows_counter.inc(df.count())
         save_to_db(df, StockATR)
 
 
@@ -400,5 +407,5 @@ def calculate_obv(summaries):
                 "volume_direction",
             )
         )
-
+        rows_counter.inc(df.count())
         save_to_db(df, StockOBV)
