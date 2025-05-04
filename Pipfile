@@ -10,6 +10,7 @@ pandas = "*"
 pyspark = "*"
 peewee = "*"
 psycopg2-binary = "*"
+prometheus-client = "*"
 
 [dev-packages]
 

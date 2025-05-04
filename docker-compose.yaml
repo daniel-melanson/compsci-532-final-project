@@ -1,4 +1,16 @@
 services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
+  grafana:
+    image: grafana/grafana-oss
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
   analytics-engine:
     tty: true
     stdin_open: true
@@ -12,6 +24,9 @@ services:
       - DEBUG=true
     depends_on:
       - db
+      - prometheus
+    ports:
+      - "8000:8000"
   db:
     image: postgres
     volumes:
@@ -41,3 +56,4 @@ services:
 volumes:
   pgdata:
   metabasedata:
+  grafana-data:

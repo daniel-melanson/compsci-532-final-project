@@ -14,6 +14,7 @@ from pyspark.sql.functions import (
     stddev,
 )
 from pyspark.sql.window import Window
+from prometheus_client import Summary
 from models import (
     Stock,
     StockDailySummary,
@@ -42,7 +43,10 @@ Stocks: Daily percent change, daily absolute change, rolling 50-day average, sec
 Sectors: Daily percent change, daily absolute change, rolling 50-day average, market capitalization
 """
 
+init_stocks_summary = Summary("init_stocks", "Time taken to initialize stocks")
 
+
+@init_stocks_summary.time()
 def init_stocks():
     """
     Initialize the stocks in the database with sectors.
@@ -73,6 +77,10 @@ def init_stocks():
     Stock.insert_many(df.to_dict(orient="records")).on_conflict_ignore().execute()
 
 
+read_data_summary = Summary("read_data", "Time taken to read data")
+
+
+@read_data_summary.time()
 def read_data(spark):
     """
     Read the data from the Kaggle dataset. Caches the data in the file system.
@@ -120,6 +128,10 @@ def iterate_dataframes(dataframes):
             break
 
 
+save_to_db_summary = Summary("save_to_db", "Time taken to save to database")
+
+
+@save_to_db_summary.time()
 def save_to_db(df, model):
     """
     Save a DataFrame to a PostgreSQL database table.
@@ -134,6 +146,12 @@ def save_to_db(df, model):
     #     model.insert_many(batch_df.to_dict(orient="records")).on_conflict_ignore().execute()
 
 
+calculate_daily_summary_summary = Summary(
+    "calculate_daily_summary", "Time taken to calculate daily summary"
+)
+
+
+@calculate_daily_summary_summary.time()
 def calculate_daily_summary(dataframes):
     # Daily Summary = Open, High, Low, Close, Volume, Absolute Change, Percentage Change
     # Absolute Change = Close - Open
@@ -173,6 +191,12 @@ def calculate_daily_summary(dataframes):
     return summary_dfs
 
 
+calculate_moving_averages_summary = Summary(
+    "calculate_moving_averages", "Time taken to calculate moving averages"
+)
+
+
+@calculate_moving_averages_summary.time()
 def calculate_moving_averages(summaries, period=50):
     # Moving Average = (Sum of Close Prices) / (Number of Days)
     StockMovingAverage.delete().execute()
@@ -202,6 +226,10 @@ def calculate_moving_averages(summaries, period=50):
         save_to_db(df, StockMovingAverage)
 
 
+calculate_rsi_summary = Summary("calculate_rsi", "Time taken to calculate RSI")
+
+
+@calculate_rsi_summary.time()
 def calculate_rsi(summaries):
     # RSI = 100 - (100 / (1 + RS))
     # Where RS = Average Gain / Average Loss over N periods (N=14)
@@ -256,6 +284,12 @@ def calculate_rsi(summaries):
         save_to_db(df, StockRSI)
 
 
+calculate_bollinger_bands_summary = Summary(
+    "calculate_bollinger_bands", "Time taken to calculate Bollinger Bands"
+)
+
+
+@calculate_bollinger_bands_summary.time()
 def calculate_bollinger_bands(summaries):
     # Middle Band = 20-day SMA
     # Upper Band = Middle Band + (20-day standard deviation × 2)
@@ -288,6 +322,10 @@ def calculate_bollinger_bands(summaries):
         save_to_db(df, StockBollingerBand)
 
 
+calculate_atr_summary = Summary("calculate_atr", "Time taken to calculate ATR")
+
+
+@calculate_atr_summary.time()
 def calculate_atr(summaries):
     # True Range = Max(high - low, abs(high - prev_close), abs(low - prev_close))
     # ATR = Average of True Range over N periods (N=14)
@@ -323,6 +361,10 @@ def calculate_atr(summaries):
         save_to_db(df, StockATR)
 
 
+calculate_obv_summary = Summary("calculate_obv", "Time taken to calculate OBV")
+
+
+@calculate_obv_summary.time()
 def calculate_obv(summaries):
     # OBV = Previous OBV +
     #       - Current Volume (if close < prev_close)

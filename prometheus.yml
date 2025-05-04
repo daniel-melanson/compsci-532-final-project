@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s # when Prometheus is pulling data from exporters etc
+  evaluation_interval: 30s # time between each evaluation of Prometheus' alerting rules
+
+scrape_configs:
+  - job_name: analytics-engine   # your project name
+    static_configs:
+      - targets:
+        - analytics-engine:8000
